@@ -20,7 +20,14 @@ from io import BytesIO
 
 
 def resize_image(img, new_w):
-    h, w, _ = img.shape
+
+    # if gray scale
+    if len(img.shape) == 2:
+        h, w = img.shape
+    elif len(img.shape) == 3:
+        h, w, _ = img.shape
+    else:
+        raise ValueError('unknown image shape: {}'.format(img.shape))
     scale = float(new_w) / w
     new_h = int(h * scale)
     new_img = imresize(img, (new_h, new_w), interp='bilinear')
