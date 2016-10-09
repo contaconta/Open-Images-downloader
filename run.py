@@ -17,6 +17,8 @@ import click
 from scipy.misc import imresize, imread, imsave
 from time import sleep
 from io import BytesIO
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = 1000000000
 
 
 def resize_image(img, new_w):
