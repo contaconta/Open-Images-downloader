@@ -16,6 +16,7 @@ from concurrent import futures
 import click
 from scipy.misc import imresize, imread, imsave
 from time import sleep
+from io import BytesIO
 
 
 def resize_image(img, new_w):
@@ -26,7 +27,7 @@ def resize_image(img, new_w):
     return new_img
 
 
-def download_image(image_id, url, save_dirname, resize_width):
+def download_image(image_id, url, save_dirname, resize_width, timeout):
     file_name = url.split("/")[-1]
     filepath = os.path.join(save_dirname,
                             '{}____{}'.format(image_id, file_name))
@@ -34,25 +35,22 @@ def download_image(image_id, url, save_dirname, resize_width):
     if os.path.exists(filepath):
         return True
 
-    res = requests.get(url, stream=True)
+    res = requests.get(url, timeout=timeout)
 
     if res.status_code != 200:
         print('warn: status code is {} - {}'.format(res.status_code, url))
         return False
 
-    with open(filepath, 'wb') as file:
-        for chunk in res.iter_content(chunk_size=1024):
-            file.write(chunk)
     try:
         # resize and save image
-        img = imread(filepath)
+        img = imread(BytesIO(res.content))
         if img.shape[1] > resize_width:
             resized = resize_image(img, resize_width)
             imsave(filepath, resized)
     except Exception as e:
-        print('warn: failed to process {}, url: {}'.format(filepath, url))
-        os.remove(filepath)
+        print('warn: failed to process {}, url: {}, img.shape: {}'.format(filepath, url, img.shape))
         print(e)
+        os.remove(filepath)
         return False
     return True
 
@@ -65,7 +63,8 @@ def load_csv(csv_filepath):
     return lists
 
 
-def download_images_from_csv(csv_filepath, save_dir, num_workers, resize_width):
+def download_images_from_csv(csv_filepath, save_dir, num_workers,
+                             resize_width, timeout):
     lists = load_csv(csv_filepath)
     print('csv:', csv_filepath, 'save dir:', save_dir)
     if not os.path.exists(save_dir):
@@ -75,7 +74,8 @@ def download_images_from_csv(csv_filepath, save_dir, num_workers, resize_width):
         image_id, url = row[0], row[1]
         retry_count = 3
         while retry_count > 0:
-            res = download_image(image_id, url, save_dir, resize_width)
+            res = download_image(image_id, url, save_dir, resize_width,
+                                 timeout)
             if res:
                 break
             retry_count -= 1
@@ -100,14 +100,20 @@ def download_images_from_csv(csv_filepath, save_dir, num_workers, resize_width):
 @click.argument('save_dir')
 @click.option('--num_workers', default=1)
 @click.option('--resize_width', default=1024)
-def main(train_csv, validation_csv, save_dir, num_workers, resize_width):
+@click.option('--timeout', default=60)
+def main(train_csv, validation_csv, save_dir, num_workers, resize_width,
+         timeout):
+    print('opt - save_dir: {}, num_workers: {}, resize_width: {}, timeout: {}'
+          .format(save_dir, num_workers, resize_width, timeout))
     print('download train images')
     download_images_from_csv(train_csv,
-                             os.path.join(save_dir, 'train'), num_workers, resize_width)
+                             os.path.join(save_dir, 'train'), num_workers,
+                             resize_width, timeout)
 
     print('download validation images')
     download_images_from_csv(validation_csv,
-                             os.path.join(save_dir, 'validation'), num_workers, resize_width)
+                             os.path.join(save_dir, 'validation'),
+                             num_workers, resize_width, timeout)
 
 
 if __name__ == '__main__':
