@@ -7,7 +7,7 @@ It needs large amount of disk space.
 ## Preparation
 
 ```
-pip install -r requiments
+pip install -r requiments.txt
 ```
 
 ## How to use it
